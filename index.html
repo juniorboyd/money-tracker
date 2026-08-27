@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Money Lover - บันทึกรายรับรายจ่าย</title>
+    
+    <!-- Google Fonts: Inter & Prompt -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- jsQR for bank slip QR decoding -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    
+    <!-- Tesseract.js for OCR text recognition -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.3/dist/tesseract.min.js"></script>
+    
+    <!-- Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="logo-icon"><i class="fa-solid fa-wallet"></i></div>
+                <div class="logo-text">Money <span>Lover</span></div>
+            </div>
+            
+            <nav class="sidebar-menu">
+                <button class="menu-item active" data-tab="dashboard">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>แดชบอร์ด</span>
+                </button>
+                <button class="menu-item" data-tab="transactions">
+                    <i class="fa-solid fa-list-check"></i>
+                    <span>รายการบัญชี</span>
+                </button>
+                <button class="menu-item" data-tab="analytics">
+                    <i class="fa-solid fa-chart-column"></i>
+                    <span>รายงาน & กราฟ</span>
+                </button>
+                <button class="menu-item" data-tab="wallets">
+                    <i class="fa-solid fa-vault"></i>
+                    <span>กระเป๋าเงิน</span>
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button id="theme-toggle" class="footer-btn">
+                    <i class="fa-solid fa-moon"></i>
+                    <span id="theme-text">โหมดมืด</span>
+                </button>
+                <button id="backup-btn" class="footer-btn">
+                    <i class="fa-solid fa-download"></i>
+                    <span>สำรองข้อมูล</span>
+                </button>
+                <button id="restore-btn" class="footer-btn">
+                    <i class="fa-solid fa-upload"></i>
+                    <span>กู้คืนข้อมูล</span>
+                </button>
+                <input type="file" id="restore-input" style="display: none;" accept=".json">
+                
+                <div class="slipok-config-container" style="margin-top: 10px; padding: 10px; border-top: 1px dashed var(--border-color); display: flex; flex-direction: column; gap: 6px;">
+                    <label for="slipok-key" style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">SlipOK API Key</label>
+                    <input type="password" id="slipok-key" placeholder="ใส่ Key เพื่อเชื่อมต่อจริง" style="padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 12px; width: 100%; outline: none; background: var(--bg-input); color: var(--text-primary);">
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-left">
+                    <button class="mobile-menu-toggle"><i class="fa-solid fa-bars"></i></button>
+                    <h1 id="page-title">แดชบอร์ด</h1>
+                </div>
+                <div class="header-right">
+                    <div class="wallet-selector-container">
+                        <i class="fa-solid fa-wallet"></i>
+                        <select id="header-wallet-select">
+                            <option value="all">กระเป๋าเงินทั้งหมด</option>
+                        </select>
+                    </div>
+                    <button id="header-upload-slip-btn" class="btn btn-secondary-outline">
+                        <i class="fa-solid fa-qrcode"></i> สแกนสลิป
+                    </button>
+                    <input type="file" id="slip-file-input" style="display: none;" accept="image/*">
+                    <button id="quick-add-btn" class="btn btn-primary">
+                        <i class="fa-solid fa-plus"></i> บันทึกรายการ
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-body">
+                <!-- PANEL: DASHBOARD -->
+                <section id="panel-dashboard" class="tab-panel active">
+                    <!-- Balance Summary Cards -->
+                    <div class="summary-cards">
+                        <div class="card summary-card balance">
+                            <div class="card-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+                            <div class="card-info">
+                                <h3>ยอดเงินคงเหลือรวม</h3>
+                                <p class="amount" id="total-balance">฿0.00</p>
+                            </div>
+                        </div>
+                        <div class="card summary-card income">
+                            <div class="card-icon"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                            <div class="card-info">
+                                <h3>รายรับเดือนนี้</h3>
+                                <p class="amount text-success" id="monthly-income">฿0.00</p>
+                            </div>
+                        </div>
+                        <div class="card summary-card expense">
+                            <div class="card-icon"><i class="fa-solid fa-arrow-trend-down"></i></div>
+                            <div class="card-info">
+                                <h3>รายจ่ายเดือนนี้</h3>
+                                <p class="amount text-danger" id="monthly-expense">฿0.00</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Grid -->
+                    <div class="dashboard-grid">
+                        <!-- Recent Transactions -->
+                        <div class="card grid-main">
+                            <div class="card-header">
+                                <h2>รายการล่าสุด</h2>
+                                <button class="btn btn-text" id="view-all-transactions">ดูทั้งหมด</button>
+                            </div>
+                            <div class="card-body">
+                                <div class="transaction-list" id="recent-transaction-list">
+                                    <!-- Dynamic Content -->
+                                    <div class="empty-state">
+                                        <i class="fa-solid fa-receipt"></i>
+                                        <p>ยังไม่มีรายการบันทึก</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mini Charts -->
+                        <div class="card grid-sidebar">
+                            <div class="card-header">
+                                <h2>สัดส่วนรายจ่าย</h2>
+                            </div>
+                            <div class="card-body centered-flex">
+                                <div class="chart-container-mini">
+                                    <canvas id="dashboard-expense-chart"></canvas>
+                                </div>
+                                <div id="dashboard-expense-legend" class="chart-legend-custom"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PANEL: TRANSACTIONS -->
+                <section id="panel-transactions" class="tab-panel">
+                    <!-- Filters Toolbar -->
+                    <div class="card filter-toolbar">
+                        <div class="filter-group">
+                            <div class="input-icon-wrapper">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="filter-search" placeholder="ค้นหาบันทึก...">
+                            </div>
+                        </div>
+                        <div class="filter-group-row">
+                            <select id="filter-type">
+                                <option value="all">ทุกประเภท</option>
+                                <option value="income">รายรับ</option>
+                                <option value="expense">รายจ่าย</option>
+                            </select>
+                            <select id="filter-category">
+                                <option value="all">ทุกหมวดหมู่</option>
+                            </select>
+                            <input type="month" id="filter-month">
+                            <button id="clear-filters" class="btn btn-secondary-outline" title="ล้างฟิลเตอร์">
+                                <i class="fa-solid fa-arrow-rotate-left"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Main Transactions Display -->
+                    <div class="card transaction-history-card">
+                        <div class="card-header">
+                            <h2 id="transaction-history-title">รายการทั้งหมด</h2>
+                            <span class="badge" id="transaction-count">0 รายการ</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="transaction-table">
+                                    <thead>
+                                        <tr>
+                                            <th>วันที่</th>
+                                            <th>ประเภท</th>
+                                            <th>หมวดหมู่</th>
+                                            <th>จำนวนเงิน (฿)</th>
+                                            <th>กระเป๋าเงิน</th>
+                                            <th>บันทึกช่วยจำ</th>
+                                            <th>จัดการ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="full-transaction-table-body">
+                                        <!-- Dynamic Content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PANEL: ANALYTICS -->
+                <section id="panel-analytics" class="tab-panel">
+                    <div class="analytics-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>การเปรียบเทียบ รายรับ VS รายจ่าย</h2>
+                                <div class="chart-actions">
+                                    <select id="analytics-trend-year">
+                                        <option value="2026">2026</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container-large">
+                                    <canvas id="analytics-trend-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>วิเคราะห์รายจ่ายแยกตามหมวดหมู่</h2>
+                                <select id="analytics-category-month">
+                                    <!-- Dynamic options of months -->
+                                </select>
+                            </div>
+                            <div class="card-body category-analytics-container">
+                                <div class="chart-container-large-pie">
+                                    <canvas id="analytics-category-chart"></canvas>
+                                </div>
+                                <div class="category-breakdown-list" id="category-breakdown-list">
+                                    <!-- Dynamic breakdown with percentage progress bars -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PANEL: WALLETS -->
+                <section id="panel-wallets" class="tab-panel">
+                    <div class="wallets-header-actions">
+                        <h2>กระเป๋าเงินของฉัน</h2>
+                        <button id="add-wallet-btn" class="btn btn-secondary">
+                            <i class="fa-solid fa-plus"></i> เพิ่มกระเป๋าเงิน
+                        </button>
+                    </div>
+                    
+                    <div class="wallets-grid" id="wallets-grid-container">
+                        <!-- Dynamic Wallet Cards -->
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: ADD/EDIT TRANSACTION -->
+    <div id="transaction-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="transaction-modal-title">บันทึกรายการใหม่</h2>
+                <button class="close-modal-btn" data-modal="transaction-modal">&times;</button>
+            </div>
+            <form id="transaction-form" class="modal-form">
+                <input type="hidden" id="trans-id">
+                
+                <!-- Type Selector Tabs -->
+                <div class="transaction-type-tabs">
+                    <label class="type-tab expense active">
+                        <input type="radio" name="trans-type" value="expense" checked style="display:none;">
+                        <i class="fa-solid fa-arrow-trend-down"></i> รายจ่าย
+                    </label>
+                    <label class="type-tab income">
+                        <input type="radio" name="trans-type" value="income" style="display:none;">
+                        <i class="fa-solid fa-arrow-trend-up"></i> รายรับ
+                    </label>
+                </div>
+
+                <div class="form-body">
+                    <!-- Amount Input (Huge styled display) -->
+                    <div class="form-group amount-group">
+                        <label for="trans-amount">จำนวนเงิน</label>
+                        <div class="amount-input-wrapper">
+                            <span class="currency-symbol">฿</span>
+                            <input type="number" id="trans-amount" step="0.01" min="0.01" placeholder="0.00" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row-2">
+                        <!-- Wallet Selector -->
+                        <div class="form-group">
+                            <label for="trans-wallet"><i class="fa-solid fa-wallet"></i> กระเป๋าเงิน</label>
+                            <select id="trans-wallet" required>
+                                <!-- Dynamic wallets -->
+                            </select>
+                        </div>
+
+                        <!-- Category Selector -->
+                        <div class="form-group">
+                            <label for="trans-category"><i class="fa-solid fa-tag"></i> หมวดหมู่</label>
+                            <select id="trans-category" required>
+                                <!-- Dynamic categories based on type selection -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row-2">
+                        <!-- Date Picker -->
+                        <div class="form-group">
+                            <label for="trans-date"><i class="fa-solid fa-calendar-days"></i> วันที่</label>
+                            <input type="date" id="trans-date" required>
+                        </div>
+
+                        <!-- Time Picker -->
+                        <div class="form-group">
+                            <label for="trans-time"><i class="fa-solid fa-clock"></i> เวลา</label>
+                            <input type="time" id="trans-time">
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="form-group">
+                        <label for="trans-notes"><i class="fa-solid fa-pen-to-square"></i> บันทึกช่วยจำ</label>
+                        <textarea id="trans-notes" placeholder="ระบุรายละเอียดเพิ่มเติม..." rows="2"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary-outline cancel-modal-btn" data-modal="transaction-modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary" id="save-transaction-btn">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT WALLET -->
+    <div id="wallet-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="wallet-modal-title">เพิ่มกระเป๋าเงินใหม่</h2>
+                <button class="close-modal-btn" data-modal="wallet-modal">&times;</button>
+            </div>
+            <form id="wallet-form" class="modal-form">
+                <input type="hidden" id="wallet-id">
+                
+                <div class="form-body">
+                    <div class="form-group">
+                        <label for="wallet-name">ชื่อกระเป๋าเงิน</label>
+                        <input type="text" id="wallet-name" placeholder="เช่น เงินสด, บัญชีออมทรัพย์" required>
+                    </div>
+
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="wallet-type">ประเภทกระเป๋าเงิน</label>
+                            <select id="wallet-type" required>
+                                <option value="cash">เงินสด (Cash)</option>
+                                <option value="bank">บัญชีธนาคาร (Bank Account)</option>
+                                <option value="credit">บัตรเครดิต (Credit Card)</option>
+                                <option value="saving">เงินฝากประหยัด/ลงทุน (Savings)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="wallet-balance">ยอดเงินเริ่มต้น</label>
+                            <div class="amount-input-wrapper-small">
+                                <span class="currency-symbol">฿</span>
+                                <input type="number" id="wallet-balance" step="0.01" placeholder="0.00" value="0.00" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="wallet-color">สีประจำกระเป๋าเงิน</label>
+                        <div class="color-picker-container">
+                            <label class="color-option" style="background-color: #10b981;">
+                                <input type="radio" name="wallet-color" value="#10b981" checked>
+                            </label>
+                            <label class="color-option" style="background-color: #3b82f6;">
+                                <input type="radio" name="wallet-color" value="#3b82f6">
+                            </label>
+                            <label class="color-option" style="background-color: #f59e0b;">
+                                <input type="radio" name="wallet-color" value="#f59e0b">
+                            </label>
+                            <label class="color-option" style="background-color: #ef4444;">
+                                <input type="radio" name="wallet-color" value="#ef4444">
+                            </label>
+                            <label class="color-option" style="background-color: #8b5cf6;">
+                                <input type="radio" name="wallet-color" value="#8b5cf6">
+                            </label>
+                            <label class="color-option" style="background-color: #ec4899;">
+                                <input type="radio" name="wallet-color" value="#ec4899">
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary-outline cancel-modal-btn" data-modal="wallet-modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary" id="save-wallet-btn">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification system -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Main Logic Script -->
+    <script src="app.js"></script>
+</body>
+</html>

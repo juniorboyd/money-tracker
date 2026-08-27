@@ -26,8 +26,12 @@ let state = {
     activeTab: 'dashboard',
     theme: 'light',
     activeWalletFilter: 'all',
-    slipokKey: ''
+    slipokKey: '',
+    supabaseUrl: '',
+    supabaseKey: ''
 };
+
+let supabaseClient = null;
 
 // CHART VARIABLES
 let dashboardExpenseChart = null;
@@ -79,6 +83,9 @@ function loadData() {
             state = JSON.parse(savedState);
             state.activeTab = 'dashboard';
             state.activeWalletFilter = 'all';
+            setTimeout(() => {
+                if (supabaseClient) syncFromSupabase();
+            }, 500);
         } catch (e) {
             console.error('Error parsing stored data. Resetting state.', e);
             initDefaultData();
@@ -99,6 +106,9 @@ function initDefaultData() {
 
 function saveState() {
     localStorage.setItem('money_lover_state', JSON.stringify(state));
+    if (supabaseClient) {
+        pushToSupabase();
+    }
 }
 
 // INITIALIZE APP UI & LOGIC
@@ -112,6 +122,15 @@ function initApp() {
     if (keyField) {
         keyField.value = state.slipokKey || '';
     }
+
+    // Populate Supabase Settings
+    const urlField = document.getElementById('supabase-url');
+    if (urlField) urlField.value = state.supabaseUrl || '';
+    const keyDbField = document.getElementById('supabase-key');
+    if (keyDbField) keyDbField.value = state.supabaseKey || '';
+
+    // Init Supabase client and sync
+    initSupabase();
 
 
     // Tab switching setup
@@ -822,10 +841,17 @@ function handleTransactionFormSubmit(e) {
     renderAll();
 }
 
-function deleteTransaction(id) {
+async function deleteTransaction(id) {
     if (confirm('คุณต้องการลบรายการบันทึกนี้ใช่หรือไม่?')) {
         state.transactions = state.transactions.filter(t => t.id !== id);
         saveState();
+        if (supabaseClient) {
+            try {
+                await supabaseClient.from('transactions').delete().eq('id', id);
+            } catch (err) {
+                console.error("Failed to delete transaction on Supabase:", err);
+            }
+        }
         renderAll();
         showToast('ลบรายการบันทึกแล้ว', 'success');
     }
@@ -918,6 +944,13 @@ function deleteWallet(id) {
     }
     
     saveState();
+    if (supabaseClient) {
+        try {
+            await supabaseClient.from('wallets').delete().eq('id', id);
+        } catch(err) {
+            console.error("Failed to delete wallet on Supabase:", err);
+        }
+    }
     populateWalletDropdowns();
     renderAll();
     showToast('ลบกระเป๋าเงินแล้ว', 'success');
@@ -1479,3 +1512,99 @@ function getCSSColorVar(varName) {
 }
 
 
+
+
+// SUPABASE CLIENT INITIALIZATION & DATA SYNC
+function initSupabase() {
+    if (state.supabaseUrl && state.supabaseKey) {
+        try {
+            supabaseClient = supabase.createClient(state.supabaseUrl, state.supabaseKey);
+            console.log("Supabase (PostgreSQL) Client Connected.");
+        } catch(e) {
+            console.error("Supabase Init Error:", e);
+            supabaseClient = null;
+        }
+    } else {
+        supabaseClient = null;
+    }
+}
+
+async function syncFromSupabase() {
+    if (!supabaseClient) return;
+    showToast('กำลังซิงค์ข้อมูลกับ PostgreSQL...', 'info');
+    try {
+        // Fetch wallets
+        const { data: dbWallets, error: wErr } = await supabaseClient.from('wallets').select('*');
+        if (wErr) throw wErr;
+        
+        // Fetch transactions
+        const { data: dbTrans, error: tErr } = await supabaseClient.from('transactions').select('*');
+        if (tErr) throw tErr;
+
+        if (dbWallets && dbWallets.length > 0) {
+            state.wallets = dbWallets.map(w => ({
+                id: w.id,
+                name: w.name,
+                type: w.type,
+                balance: parseFloat(w.balance) || 0,
+                color: w.color,
+                currentBalance: parseFloat(w.current_balance) || 0
+            }));
+        }
+
+        if (dbTrans) {
+            state.transactions = dbTrans.map(t => ({
+                id: t.id,
+                type: t.type,
+                amount: parseFloat(t.amount) || 0,
+                walletId: t.wallet_id,
+                categoryId: t.category_id,
+                date: t.date,
+                time: t.time || '00:00',
+                notes: t.notes || ''
+            }));
+        }
+
+        localStorage.setItem('money_lover_state', JSON.stringify(state));
+        populateWalletDropdowns();
+        renderAll();
+        showToast('ซิงค์ข้อมูลกับ PostgreSQL สำเร็จ!', 'success');
+    } catch(err) {
+        console.error("Supabase Pull Error:", err);
+        showToast('การเชื่อมต่อกับ PostgreSQL ล้มเหลว จะบันทึกข้อมูลในเครื่องชั่วคราว', 'warning');
+    }
+}
+
+async function pushToSupabase() {
+    if (!supabaseClient) return;
+    try {
+        const walletsData = state.wallets.map(w => ({
+            id: w.id,
+            name: w.name,
+            type: w.type,
+            balance: w.balance,
+            color: w.color,
+            current_balance: w.currentBalance || w.balance
+        }));
+
+        const transData = state.transactions.map(t => ({
+            id: t.id,
+            type: t.type,
+            amount: t.amount,
+            wallet_id: t.walletId,
+            category_id: t.categoryId,
+            date: t.date,
+            time: t.time || '00:00',
+            notes: t.notes || ''
+        }));
+
+        if (walletsData.length > 0) {
+            await supabaseClient.from('wallets').upsert(walletsData, { onConflict: 'id' });
+        }
+        if (transData.length > 0) {
+            await supabaseClient.from('transactions').upsert(transData, { onConflict: 'id' });
+        }
+    } catch(err) {
+        console.error("Supabase Push Error:", err);
+    }
+}

@@ -22,6 +22,9 @@
     <!-- Tesseract.js for OCR text recognition -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.3/dist/tesseract.min.js"></script>
     
+    <!-- Supabase for PostgreSQL cloud database -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8/dist/umd/supabase.js"></script>
+    
     <!-- Style Sheet -->
     <link rel="stylesheet" href="style.css">
 </head>
@@ -72,6 +75,12 @@
                 <div class="slipok-config-container" style="margin-top: 10px; padding: 10px; border-top: 1px dashed var(--border-color); display: flex; flex-direction: column; gap: 6px;">
                     <label for="slipok-key" style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">SlipOK API Key</label>
                     <input type="password" id="slipok-key" placeholder="ใส่ Key เพื่อเชื่อมต่อจริง" style="padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 12px; width: 100%; outline: none; background: var(--bg-input); color: var(--text-primary);">
+                </div>
+
+                <div class="supabase-config-container" style="margin-top: 5px; padding: 10px; border-top: 1px dashed var(--border-color); display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">PostgreSQL (Supabase) Sync</label>
+                    <input type="text" id="supabase-url" placeholder="Supabase Project URL" style="padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 11px; width: 100%; outline: none; background: var(--bg-input); color: var(--text-primary);">
+                    <input type="password" id="supabase-key" placeholder="Supabase Anon Key" style="padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 11px; width: 100%; outline: none; background: var(--bg-input); color: var(--text-primary);">
                 </div>
             </div>
         </aside>

@@ -1516,9 +1516,14 @@ function getCSSColorVar(varName) {
 
 // SUPABASE CLIENT INITIALIZATION & DATA SYNC
 function initSupabase() {
-    if (state.supabaseUrl && state.supabaseKey) {
+    let url = state.supabaseUrl;
+    // Auto-format project ID to full supabase.co URL if only ID is provided
+    if (url && !url.startsWith('http') && !url.includes('.')) {
+        url = `https://${url.trim()}.supabase.co`;
+    }
+    if (url && state.supabaseKey) {
         try {
-            supabaseClient = supabase.createClient(state.supabaseUrl, state.supabaseKey);
+            supabaseClient = supabase.createClient(url, state.supabaseKey);
             console.log("Supabase (PostgreSQL) Client Connected.");
         } catch(e) {
             console.error("Supabase Init Error:", e);

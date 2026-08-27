@@ -989,6 +989,15 @@ function setupEventListeners() {
         document.querySelector('.sidebar').classList.add('mobile-open');
     });
 
+    // Mobile menu close button
+    const closeSidebarBtn = document.querySelector('.mobile-sidebar-close');
+    if (closeSidebarBtn) {
+        closeSidebarBtn.addEventListener('click', () => {
+            document.querySelector('.sidebar').classList.remove('mobile-open');
+        });
+    }
+
+
     // Backup & Restore Buttons
     document.getElementById('backup-btn').addEventListener('click', backupData);
     document.getElementById('restore-btn').addEventListener('click', () => {

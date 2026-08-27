@@ -926,7 +926,7 @@ function handleWalletFormSubmit(e) {
     renderAll();
 }
 
-function deleteWallet(id) {
+async function deleteWallet(id) {
     // Check if wallet is used by transactions
     const counts = state.transactions.filter(t => t.walletId === id).length;
     if (counts > 0) {
